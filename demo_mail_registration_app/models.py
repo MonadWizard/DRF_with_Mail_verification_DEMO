@@ -54,13 +54,22 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
-    def tokens(self):
-        return ''
 
-    # def tokens(self):
-    #     refresh = RefreshToken.for_user(self)
-    #     return {
-    #         'refresh': str(refresh),
-    #         'access': str(refresh.access_token)
-    #     }
 
+
+
+
+
+# from django.db import models
+# from django.contrib.auth.models import AbstractUser
+
+
+# # Create your models here.
+# class User(AbstractUser):
+#     name = models.CharField(max_length=255)
+#     email = models.CharField(max_length=255, unique=True)
+#     password = models.CharField(max_length=255)
+#     username = None
+
+#     USERNAME_FIELD = 'email'
+#     REQUIRED_FIELDS = []

@@ -1,7 +1,10 @@
 from django.http import HttpResponse
 
 from rest_framework import generics, status, views
+from rest_framework.views import APIView
+
 from rest_framework.response import Response
+from rest_framework.exceptions import AuthenticationFailed
 
 # from rest_framework_simplejwt.tokens import 
 from .models import User
@@ -11,6 +14,7 @@ from django.urls import reverse
 import jwt, datetime
 from django.conf import settings
 from django.db import connection
+
 
 
 # Create your views here.
@@ -49,8 +53,7 @@ class RegisterView(generics.GenericAPIView):
         return Response(data, status=status.HTTP_201_CREATED)
 
 
-
-class VerifyEmail(views.APIView):
+class VerifyEmail(APIView):
 
     def get(self, request):
         token = request.GET.get('token')
@@ -73,4 +76,88 @@ class VerifyEmail(views.APIView):
             html = "<html><body>Invalid token.</body></html>"
             return HttpResponse(html)
             # return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data['email']
+        password = request.data['password']
+
+        user = User.objects.filter(email=email).first()
+        print('user::::: ', user)
+
+# check
+        if user is None:
+            raise AuthenticationFailed('User not found!')
+
+        if not user.check_password(password):
+            raise AuthenticationFailed('Incorrect password!')
+
+        payload = {
+            'id': user.id,
+            'email': user.email,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=10, seconds=30),
+            'iat': datetime.datetime.utcnow()
+        }
+
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+        response = Response()
+
+        response.set_cookie(key='jwt', value=token, httponly=True)
+        response.data = {
+            'jwt': token
+        }
+        return response
+
+
+class UserView(APIView):
+
+    def get(self, request):
+
+        token = request.COOKIES.get('jwt')
+        # print('token::::',token)
+
+        if not token:
+            raise AuthenticationFailed('Unauthenticated!')
+
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            # print('payload:::: ', payload)
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed('authenticated Expired!')
+
+        # print('payload id:::: ', payload['id'])
+        
+
+        query = f"""SELECT id, username, email, last_login
+                    FROM public.demo_mail_registration_app_user
+                    WHERE id={payload['id']};"""
+
+        with connection.cursor() as cursor:
+            q_data = cursor.execute(query)
+            q_data_fatch_all = cursor.fetchall()
+        # print('q_data_fatch_all:::: ', q_data_fatch_all)
+
+
+        return Response(q_data_fatch_all, status=status.HTTP_200_OK)
+
+
+class LogoutView(APIView):
+    def post(self, request):
+        response = Response()
+        response.delete_cookie('jwt')
+        response.data = {
+            'message': 'success'
+        }
+        return response
+
+
+
+
+
+
+
+
 
